@@ -6,7 +6,7 @@ import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { Label, Input } from "@calcom/ui";
 
 export default function TwoFactor({ center = true }) {
-  const [value, onChange] = useState("");
+  const [value, setValue] = useState("");
   const { t } = useLocale();
   const methods = useFormContext();
 
@@ -14,7 +14,7 @@ export default function TwoFactor({ center = true }) {
     acceptedCharacters: /^[0-9]$/,
     length: 6,
     value,
-    onChange,
+    onChange: setValue,
   });
 
   useEffect(() => {
@@ -23,6 +23,18 @@ export default function TwoFactor({ center = true }) {
   }, [value]);
 
   const className = "h-12 w-12 !text-xl text-center";
+
+  const handleSubmit = () => {
+    // Auto-submit the form after the user has entered the 2FA code
+    methods.trigger(); // This will trigger form validation
+    if (methods.formState.isValid) {
+      // If the form is valid, you can submit it programmatically
+      methods.handleSubmit((data) => {
+        console.log(data); // Access the form data here
+        // Add your logic to submit the form to the server
+      })();
+    }
+  };
 
   return (
     <div className={center ? "mx-auto !mt-0 max-w-sm" : "!mt-0 max-w-sm"}>
@@ -42,6 +54,7 @@ export default function TwoFactor({ center = true }) {
             {...digit}
             autoFocus={index === 0}
             autoComplete="one-time-code"
+            onChange={handleSubmit} // Call handleSubmit on each digit input change
           />
         ))}
       </div>
