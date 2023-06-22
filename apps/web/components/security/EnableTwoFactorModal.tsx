@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 
 import { ErrorCode } from "@calcom/features/auth/lib/ErrorCode";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { Button, Dialog, DialogContent, Form } from "@calcom/ui";
+import { Dialog, DialogContent, Form } from "@calcom/ui";
 
 import TwoFactor from "@components/auth/TwoFactor";
 
@@ -12,14 +12,7 @@ import TwoFactorAuthAPI from "./TwoFactorAuthAPI";
 import TwoFactorModalHeader from "./TwoFactorModalHeader";
 
 interface EnableTwoFactorModalProps {
-  /**
-   * Called when the user closes the modal without disabling two-factor auth
-   */
   onCancel: () => void;
-
-  /**
-   * Called when the user enables two-factor auth
-   */
   onEnable: () => void;
 }
 
@@ -58,18 +51,13 @@ const EnableTwoFactorModal = ({ onEnable, onCancel }: EnableTwoFactorModalProps)
   const [password, setPassword] = useState("");
   const [dataUri, setDataUri] = useState("");
   const [secret, setSecret] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleSetup(e: React.FormEvent) {
     e.preventDefault();
 
-    if (isSubmitting) {
+    if (password.length === 0) {
       return;
     }
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
 
     try {
       const response = await TwoFactorAuthAPI.setup(password);
@@ -79,51 +67,36 @@ const EnableTwoFactorModal = ({ onEnable, onCancel }: EnableTwoFactorModalProps)
         setDataUri(body.dataUri);
         setSecret(body.secret);
         setStep(SetupStep.DisplayQrCode);
-        return;
-      }
-
-      if (body.error === ErrorCode.IncorrectPassword) {
-        setErrorMessage(t("incorrect_password"));
       } else {
-        setErrorMessage(t("something_went_wrong"));
+        if (body.error === ErrorCode.IncorrectPassword) {
+          // Handle incorrect password error
+        } else {
+          // Handle other error scenarios
+        }
       }
     } catch (e) {
-      setErrorMessage(t("something_went_wrong"));
-      console.error(t("error_enabling_2fa"), e);
-    } finally {
-      setIsSubmitting(false);
+      // Handle error during setup
     }
   }
 
   async function handleEnable({ totpCode }: EnableTwoFactorValues, e: BaseSyntheticEvent | undefined) {
-    e?.preventDefault();
+    if (totpCode.length === 6) {
+      try {
+        const response = await TwoFactorAuthAPI.enable(totpCode);
+        const body = await response.json();
 
-    if (isSubmitting) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      const response = await TwoFactorAuthAPI.enable(totpCode);
-      const body = await response.json();
-
-      if (response.status === 200) {
-        onEnable();
-        return;
+        if (response.status === 200) {
+          onEnable();
+        } else {
+          if (body.error === ErrorCode.IncorrectTwoFactorCode) {
+            // Handle incorrect two-factor code error
+          } else {
+            // Handle other error scenarios
+          }
+        }
+      } catch (e) {
+        // Handle error during enabling two-factor authentication
       }
-
-      if (body.error === ErrorCode.IncorrectTwoFactorCode) {
-        setErrorMessage(`${t("code_is_incorrect")} ${t("please_try_again")}`);
-      } else {
-        setErrorMessage(t("something_went_wrong"));
-      }
-    } catch (e) {
-      setErrorMessage(t("something_went_wrong"));
-      console.error(t("error_enabling_2fa"), e);
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -149,8 +122,6 @@ const EnableTwoFactorModal = ({ onEnable, onCancel }: EnableTwoFactorModalProps)
                   className="border-default block w-full rounded-sm text-sm"
                 />
               </div>
-
-              {errorMessage && <p className="mt-1 text-sm text-red-700">{errorMessage}</p>}
             </div>
           </form>
         </WithStep>
@@ -169,35 +140,8 @@ const EnableTwoFactorModal = ({ onEnable, onCancel }: EnableTwoFactorModalProps)
           <WithStep step={SetupStep.EnterTotpCode} current={step}>
             <div className="mb-4">
               <TwoFactor center />
-
-              {errorMessage && <p className="mt-1 text-sm text-red-700">{errorMessage}</p>}
             </div>
           </WithStep>
-
-          <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-            <WithStep step={SetupStep.ConfirmPassword} current={step}>
-              <Button
-                type="submit"
-                className="ms-2 me-2"
-                onClick={handleSetup}
-                disabled={password.length === 0 || isSubmitting}>
-                {t("continue")}
-              </Button>
-            </WithStep>
-            <WithStep step={SetupStep.DisplayQrCode} current={step}>
-              <Button type="submit" className="ms-2 me-2" onClick={() => setStep(SetupStep.EnterTotpCode)}>
-                {t("continue")}
-              </Button>
-            </WithStep>
-            <WithStep step={SetupStep.EnterTotpCode} current={step}>
-              <Button type="submit" className="ms-2 me-2" disabled={isSubmitting}>
-                {t("enable")}
-              </Button>
-            </WithStep>
-            <Button color="secondary" onClick={onCancel}>
-              {t("cancel")}
-            </Button>
-          </div>
         </Form>
       </DialogContent>
     </Dialog>
